@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" overwriteAll="false" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" showNewOnSourceInSync="false" showExcludedInSync="true">
+    <serverData>
+      <paths name="hostwinds_client_interface">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/clientInterface/Deployment/LetsGoServer" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/clientInterface/Deployment/proto_client_server_shared" local="$USER_HOME$/Documents/Lets_Go_Docs/lets_go_proto/proto_client_server_shared" web="/" />
+            <mapping deploy="/clientInterface/Deployment/proto_server_specific" local="$USER_HOME$/Documents/Lets_Go_Docs/lets_go_proto/proto_server_specific" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/obsolete" />
+            <excludedPath local="true" path="$PROJECT_DIR$/server/test" />
+            <excludedPath local="true" path="$PROJECT_DIR$/server/valgrind-python.supp" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="linode_client_interface">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/clientInterface/Deployment/LetsGoServer" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/clientInterface/Deployment/proto_client_server_shared" local="$USER_HOME$/Documents/Lets_Go_Docs/lets_go_proto/proto_client_server_shared" web="/" />
+            <mapping deploy="/clientInterface/Deployment/proto_server_specific" local="$USER_HOME$/Documents/Lets_Go_Docs/lets_go_proto/proto_server_specific" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/obsolete" />
+            <excludedPath local="true" path="$PROJECT_DIR$/server/test" />
+            <excludedPath local="true" path="$PROJECT_DIR$/server/valgrind-python.supp" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

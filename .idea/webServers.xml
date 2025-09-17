@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="6f3ce659-f2a6-4319-9be1-b50f59245266" name="linode_client_interface">
+        <fileTransfer rootFolder="/home/clientinterfaceli" accessType="SFTP" host="letsgoclientinterfaceli.com" port="7828" sshConfigId="421851b7-e9b4-4a0e-8155-41dc6d65a38e" sshConfig="clientinterfaceli@letsgoclientinterfaceli.com:7828 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+      <webServer id="fd7a03e2-e774-4927-b5ff-a6c7c6d884fd" name="hostwinds_client_interface">
+        <fileTransfer rootFolder="/home/clientinterfacehw" accessType="SFTP" host="letsgoclientinterfacehw.com" port="7828" sshConfigId="52470c0a-fc43-4b59-81e1-f20b0fcd968e" sshConfig="clientinterfacehw@letsgoclientinterfacehw.com:7828 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

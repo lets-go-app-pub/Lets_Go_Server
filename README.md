@@ -1,6 +1,5 @@
 <p align="center">
-  <img src="[LetsGoAppOverview.drawio.svg](https://raw.githubusercontent.com/lets-go-app-pub/lets-go-app-pub/f6e625b44ebf1b33f40b0d87d609a730848a5931/LetsGoAppOverview.drawio.svg
-)" alt="Lets Go Architecture" width="400">
+  <img src="LetsGoAppOverview.drawio.svg" alt="Lets Go Architecture" width="400">
 </p>
 
 

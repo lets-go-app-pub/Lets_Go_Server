@@ -42,6 +42,17 @@ Separate Linux hosts for the **app server** and **MongoDB replica set**; systemd
 - `/src/matching` – aggregation→C++ converter  
 - `/config` – TLS & sample configs  
 
+## Other Useful Repositories
+
+- **Android Client (Kotlin)** — auth, profiles, activities, chat *(SDK versions may be dated)*  
+  👉 [`Lets_Go_Android_Client`](https://github.com/lets-go-app-pub/Lets_Go_Android_Client)
+
+- **Desktop Admin (Qt)** — admin/ops console for moderation, events, stats, and controls  
+  👉 [`Lets_Go_Interface`](https://github.com/lets-go-app-pub/Lets_Go_Interface)
+
+- **Protobuf Files** — protobuf files used to communicate between server and clients  
+  👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Profobuf)
+
 > **Build/Run:** Legacy notes only; modern toolchains may require updates.
 
 ## License

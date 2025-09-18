@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="LetsGoAppOverview.drawio.svg" alt="Lets Go Architecture" width="400">
+  <img src="LetsGoAppOverview.drawio.svg" alt="Lets Go Architecture" width="700">
 </p>
 
 

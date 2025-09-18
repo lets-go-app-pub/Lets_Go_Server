@@ -7,6 +7,8 @@ The application server for the Lets Go platform. Each client connection is a bid
 - **Stream lifecycle:** clear end reasons (timeout, shutdown, superseded by another device).
 - **Matching engine:** two-sided filters + point scoring, expiration windows, cooldowns/caps.
 
+## Architecture
+
 ---
 
 <p align="center">

@@ -9,13 +9,9 @@ The application server for the Lets Go platform. Each client connection is a bid
 
 ## Architecture
 
----
-
 <p align="center">
   <img src="LetsGoAppOverview.drawio.svg" alt="Lets Go Architecture" width="820">
 </p>
-
----
 
 ## Chat Streaming (how it works)
 - One **ChatStreamContainerObject** per connected user (lock-free with atomics/spinlocks).

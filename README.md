@@ -70,14 +70,20 @@ Application server for the Lets Go platform. It serves Android and Desktop Admin
 </details>
 
 ---
+
 ## Data model (selected)
-| Collection        | Purpose                         | Notable indexes / notes                            |
-|-------------------|---------------------------------|----------------------------------------------------|
-| `USER_ACCOUNTS`   | Account profile & algo fields   | `PHONE_NUMBER` (unique), `ACCOUNT_ID_LIST` (unique), algorithm index fields |
-| `PENDING_ACCOUNT` | SMS verification staging        | uniques (`INDEXING`, `ID`, `PHONE_NUMBER`); **TTL** on verification timestamp |
-| `MESSAGES` / `ROOMS` | Chat storage + membership   | room id + timestamps; observed by change streams   |
-| `MATCHES`         | Candidate matches               | `userId`, `activityId`; recent-match recency idx   |
-| `ERRORS`          | Fresh/handled errors            | compound indexes; mark-type-as-handled workflow    |
+
+MongoDB is organized by **database (domain)** → collections:
+
+- `accounts_objects`: `USER_ACCOUNTS` (unique `PHONE_NUMBER`, `ACCOUNT_ID_LIST`), `PENDING_ACCOUNT` (TTL on verification).
+- `chat_rooms_objects`: `ROOMS` (membership/metadata), `MESSAGES` (roomId+timestamps; observed via **change streams**).
+- `deleted_objects`: soft-deleted `MESSAGES/ROOMS/ACCOUNTS` retained for audit (timestamp indexed).
+- `errors_objects`: `FRESH_ERRORS` and `HANDLED_ERRORS` (supports “mark type as handled” workflow).
+- `feedback_objects`: `FEEDBACK` (type, context, created time).
+- `info_for_statistics_objects`: daily pre-aggregates (user and matching stats by date).
+- `reports_objects`: `REPORTS` (reporter→target), `DISCIPLINARY_ACTIONS` (action timeline).
+
+**Notes:** Indexes/TTLs are validated at startup; relationships are by IDs (no cross-DB joins).
 
 ---
 

@@ -1,17 +1,53 @@
 # Lets_Go_Server — Stateless C++ Application Server
 
-The application server for the Lets Go platform. Each client connection is a bidirectional gRPC stream managed by a **ChatStreamContainerObject**; a MongoDB **change stream** injects new messages to the right user, and targeted reads fetch message bodies on demand. Designed for horizontal scale with one `GrpcServerImpl` per instance.
+Application server for the Lets Go platform. It serves Android and Desktop Admin clients over **gRPC/Protobuf**, persists to a **MongoDB replica set**, streams chat in real time, and embeds a matching engine (Mongo aggregation → compiled C++ pipeline). I led the architecture and implementation of the server and operations.
 
-## Highlights
-- **Async model:** completion-queue tags → thread pool; per-stream call data executes off the server thread.
-- **Stream lifecycle:** clear end reasons (timeout, shutdown, superseded by another device).
-- **Matching engine:** two-sided filters + point scoring, expiration windows, cooldowns/caps.
+> **Stack:** C++ · gRPC/Protobuf · MongoDB (Replica Set) · Linux (systemd) · SSL/TLS  
+> **Clients & Integrations:** Android Client · Desktop Admin (Qt) · WordPress site · Twilio (SMS) · SendGrid (Email)
 
 ## Architecture
 
 <p align="center">
   <img src="LetsGoAppOverview.drawio.svg" alt="Lets Go Architecture" width="820">
 </p>
+
+---
+
+## Highlights (skim me)
+- **Async, scalable core:** gRPC **completion queue** + thread pool; one lifecycle `GrpcServerImpl` per process; stateless request handlers.
+- **Reliable streaming chat:** one stream container per user; **Mongo change stream** injects live messages; tolerant of duplicates to avoid misses; lightweight ordering window.
+- **Fairness built-in:** writes are intentionally pushed to the **back** of the completion queue (via alarms) so reads/heartbeats aren’t starved.
+- **Declarative matching:** two-sided filters + point scoring (time windows, category/activity overlap, recency/inactivity penalties) with clear terminal “cap” messages (success/no-matches/cooldown/no-swipes).
+- **Operational clarity:** app nodes and Mongo RS run on **separate Linux servers**; TLS termination, backups, and index bootstrap handled in repo.
+
+---
+
+## What the server can do (Proto surface at a glance)
+
+**User/Auth & Session**
+- `LoginFunction.proto`, `LoginSupportFunctions.proto`, `LoginToServerBasicInfo.proto`, `LoginValuesToReturnToClient.proto`, `PreLoginTimestamps.proto`, `AccountState.proto`, `UserAccountType.proto`, `AccountLoginTypeEnum.proto`, `AccessStatusEnum.proto`, `UserSubscriptionStatus.proto`
+
+**SMS/Email & Verification**
+- `SMSVerification.proto`, `EmailSendingMessages.proto`
+
+**Chat & Rooms**
+- `ChatMessageStream.proto`, `TypeOfChatMessage.proto`, `ChatMessageToClientMessage.proto`, `ChatRoomInfoMessage.proto`, `ChatRoomCommands.proto`, `CreatedChatRoomInfo.proto`, `UpdateOtherUserMessages.proto`, `MemberSharedInfoMessage.proto`
+
+**Matching & Discovery**
+- `FindMatches.proto`, `UserMatchOptions.proto`, `AlgorithmSearchOptions.proto`, `CategoryTimeFrame.proto`, `LetsGoEventStatus.proto`
+
+**Requests & Data Access**
+- `RequestMessages.proto`, `RequestFields.proto`, `RequestInformation.proto` (if present), `RetrieveServerLoad.proto`
+
+**Feedback/Reporting/Errors**
+- `FeedbackTypeEnum.proto`, `ReportMessages.proto`, `ErrorMessage.proto`, `ErrorOriginEnum.proto`, `SendErrorToServer.proto`
+
+**Admin (Desktop Interface / Ops)**
+- `AdminChatRoomCommands.proto`, `AdminEventCommands.proto`, `ManageServerCommands.proto`, `RequestAdminInfo.proto`, `RequestStatistics.proto`, `RequestUserAccountInfo.proto`, `SetAdminFields.proto`, `HandleErrors.proto`, `HandleReports.proto`, `HandleFeedback.proto`, `ErrorHandledMoveReasonEnum.proto`, `AdminLevelEnum.proto`, `UserAccountStatusEnum.proto`, `MatchTypeEnum.proto`, `AccountCategoryEnum.proto`
+
+> Contracts live in their own repo: **Lets_Go_Profobuf** (shared `.proto` files).  
+
+---
 
 ## Chat Streaming (how it works)
 - One **ChatStreamContainerObject** per connected user (lock-free with atomics/spinlocks).
@@ -36,11 +72,25 @@ The application server for the Lets Go platform. Each client connection is a bid
 ## Ops (summary)
 Separate Linux hosts for the **app server** and **MongoDB replica set**; systemd service, TLS, backups/restore, basic health metrics.
 
-## Repo Tour
-- `/src/server` – gRPC service impls  
-- `/src/db` – Mongo client, repos, index bootstrap  
-- `/src/matching` – aggregation→C++ converter  
-- `/config` – TLS & sample configs  
+---
+
+## How it works
+
+### Chat streaming (bidirectional)
+- **Per-user stream container:** Each connected user gets a container object managing the bidirectional stream; it uses a lock-free design (atomics/spinlocks where needed).
+- **Live message fan-out:** A MongoDB **change stream** thread watches relevant collections and injects new messages/events into the user’s stream; targeted reads fill gaps by message id(s).
+- **Ordering & reliability:** The server tolerates **duplicates** rather than miss events, and uses a small **buffer window** plus single-thread injection to improve apparent ordering.
+
+### Matching (overview)
+- **Filter both sides** first (age, genders, distance) and require **category/activity overlap**; then **score** candidates (window overlaps, short-window bonuses, “between” windows), subtracting for **inactivity** and **recent matches**.
+- Results **always end with a cap** message that tells the client the terminal state (success, no matches, cooldown required, out of swipes).
+
+### Server runtime model
+- **Async CQ + thread pool:** the gRPC server thread parks on the completion queue; per-call “call data” executes off-thread.
+- **Fairness:** writes are posted behind reads/alarms (via CQ alarm) so long-running writes don’t starve the stream.
+- **Stream lifecycle:** explicit down reasons (timeout, server shutdown, superseded by a newer device connection).
+
+---
 
 ## Other Related Repositories
 
@@ -56,7 +106,6 @@ Separate Linux hosts for the **app server** and **MongoDB replica set**; systemd
 - **Protobuf Files** — protobuf files used to communicate between server and clients  
   👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Profobuf)
 
-> **Build/Run:** Legacy notes only; modern toolchains may require updates.
 
 ## License
 MIT

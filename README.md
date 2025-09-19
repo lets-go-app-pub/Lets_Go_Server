@@ -1,9 +1,9 @@
 # Lets_Go_Server — Stateless C++ Application Server
 
-Application server for the Lets Go platform. It serves Android and Desktop Admin clients over **gRPC/Protobuf**, persists to a **MongoDB replica set**, streams chat in real time, and embeds a matching engine (Mongo aggregation → compiled C++ pipeline). I led the architecture and implementation of the server and operations.
+Application server for the Lets Go platform. It serves Android and Desktop Admin clients over **gRPC/Protobuf**, persists to a **MongoDB replica set**, streams chat in real time, and embeds a matching engine (Mongo aggregation → compiled C++ pipeline). I led the architecture and server operations.
 
 > **Stack:** C++ · gRPC/Protobuf · MongoDB (Replica Set) · Linux (systemd) · SSL/TLS  
-> **Clients & Integrations:** Android Client · Desktop Admin (Qt) · WordPress site · Twilio (SMS) · SendGrid (Email)
+> **Clients & Integrations:** Android Client · Desktop Admin (Qt) · WordPress site · **Twilio** (SMS) · **SendGrid** (Email)
 
 ## Architecture
 
@@ -14,83 +14,96 @@ Application server for the Lets Go platform. It serves Android and Desktop Admin
 ---
 
 ## Highlights (skim me)
-- **Async, scalable core:** gRPC **completion queue** + thread pool; one lifecycle `GrpcServerImpl` per process; stateless request handlers.
-- **Reliable streaming chat:** one stream container per user; **Mongo change stream** injects live messages; tolerant of duplicates to avoid misses; lightweight ordering window.
-- **Fairness built-in:** writes are intentionally pushed to the **back** of the completion queue (via alarms) so reads/heartbeats aren’t starved.
-- **Declarative matching:** two-sided filters + point scoring (time windows, category/activity overlap, recency/inactivity penalties) with clear terminal “cap” messages (success/no-matches/cooldown/no-swipes).
-- **Operational clarity:** app nodes and Mongo RS run on **separate Linux servers**; TLS termination, backups, and index bootstrap handled in repo.
-
----
-
-## What the server can do (Proto surface at a glance)
-
-**User/Auth & Session**
-- `LoginFunction.proto`, `LoginSupportFunctions.proto`, `LoginToServerBasicInfo.proto`, `LoginValuesToReturnToClient.proto`, `PreLoginTimestamps.proto`, `AccountState.proto`, `UserAccountType.proto`, `AccountLoginTypeEnum.proto`, `AccessStatusEnum.proto`, `UserSubscriptionStatus.proto`
-
-**SMS/Email & Verification**
-- `SMSVerification.proto`, `EmailSendingMessages.proto`
-
-**Chat & Rooms**
-- `ChatMessageStream.proto`, `TypeOfChatMessage.proto`, `ChatMessageToClientMessage.proto`, `ChatRoomInfoMessage.proto`, `ChatRoomCommands.proto`, `CreatedChatRoomInfo.proto`, `UpdateOtherUserMessages.proto`, `MemberSharedInfoMessage.proto`
-
-**Matching & Discovery**
-- `FindMatches.proto`, `UserMatchOptions.proto`, `AlgorithmSearchOptions.proto`, `CategoryTimeFrame.proto`, `LetsGoEventStatus.proto`
-
-**Requests & Data Access**
-- `RequestMessages.proto`, `RequestFields.proto`, `RequestInformation.proto` (if present), `RetrieveServerLoad.proto`
-
-**Feedback/Reporting/Errors**
-- `FeedbackTypeEnum.proto`, `ReportMessages.proto`, `ErrorMessage.proto`, `ErrorOriginEnum.proto`, `SendErrorToServer.proto`
-
-**Admin (Desktop Interface / Ops)**
-- `AdminChatRoomCommands.proto`, `AdminEventCommands.proto`, `ManageServerCommands.proto`, `RequestAdminInfo.proto`, `RequestStatistics.proto`, `RequestUserAccountInfo.proto`, `SetAdminFields.proto`, `HandleErrors.proto`, `HandleReports.proto`, `HandleFeedback.proto`, `ErrorHandledMoveReasonEnum.proto`, `AdminLevelEnum.proto`, `UserAccountStatusEnum.proto`, `MatchTypeEnum.proto`, `AccountCategoryEnum.proto`
-
-> Contracts live in their own repo: **Lets_Go_Profobuf** (shared `.proto` files).  
-
----
-
-## Chat Streaming (how it works)
-- One **ChatStreamContainerObject** per connected user (lock-free with atomics/spinlocks).
-- Mongo **change stream** → injects new DB messages → user’s stream; on-demand lookups by msg id(s).
-- Ordering & reliability: tolerate duplicates to avoid misses; single-thread injection + short delay for better ordering.
-
-## Matching (overview)
-- Filter both sides (age, genders, distance, activity/category overlap), then score matches; expiration depends on overlap/“anytime”/etc.
-- The server always ends the stream with a **cap** message (success/no-matches/cooldown/no-swipes).
-
-## Accounts & Auth (server view)
-- **Login** returns tokens, timestamps, and server category/activity indexes; pending accounts use TTL.
-- **SMS Verification** supports: add installation to existing account (birthday check) **or** create fresh account; rationale: reused phone numbers.
-
-## Error Handling (admin-facing)
-- Fresh errors are triaged; you can delete an instance or **mark a type “handled”** (moves all of that type and stops storing new ones). Indexed for fast queries.
-
-## Data Model (selected)
-- **Users**: phone/account ids + algo index (for matching).
-- **Pending Accounts**: unique fields + TTL index to auto-clean.
-
-## Ops (summary)
-Separate Linux hosts for the **app server** and **MongoDB replica set**; systemd service, TLS, backups/restore, basic health metrics.
+- **Async, scalable core:** gRPC **completion queue** + thread pool; one lifecycle `GrpcServerImpl`; stateless handlers.
+- **Reliable streaming chat:** per-user stream container; **Mongo change stream** fan-out; duplicate-tolerant with a small ordering window.
+- **Fairness built-in:** writes are pushed to the **back** of the completion queue (alarms) so reads/heartbeats aren’t starved.
+- **Declarative matching:** two-sided filters + point scoring (time windows, activity/category overlap, recency/inactivity penalties) with clear terminal **cap** messages.
+- **Operations:** app nodes and Mongo RS on **separate Linux servers**; TLS, backups, and index bootstrap included.
 
 ---
 
 ## How it works
 
-### Chat streaming (bidirectional)
-- **Per-user stream container:** Each connected user gets a container object managing the bidirectional stream; it uses a lock-free design (atomics/spinlocks where needed).
-- **Live message fan-out:** A MongoDB **change stream** thread watches relevant collections and injects new messages/events into the user’s stream; targeted reads fill gaps by message id(s).
-- **Ordering & reliability:** The server tolerates **duplicates** rather than miss events, and uses a small **buffer window** plus single-thread injection to improve apparent ordering.
+### Streaming (bidirectional chat)
+- One **ChatStreamContainerObject** per connected user (lock-free with atomics/spinlocks).  
+- A MongoDB **change stream** injects new messages/events into the user’s stream; targeted reads fill gaps by message id(s).  
+- Prefer **duplicates** over misses; a brief buffer window plus single-thread injection improves apparent ordering.
 
 ### Matching (overview)
-- **Filter both sides** first (age, genders, distance) and require **category/activity overlap**; then **score** candidates (window overlaps, short-window bonuses, “between” windows), subtracting for **inactivity** and **recent matches**.
-- Results **always end with a cap** message that tells the client the terminal state (success, no matches, cooldown required, out of swipes).
+- **Filter both sides** (age, genders, distance) and require **category/activity overlap**.  
+- **Score** candidates (window overlaps, short-window bonuses, “between” windows), subtracting for **inactivity** and **recent matches**.  
+- Results **always end with a cap** indicating success, no matches, cooldown, or out of swipes.
 
-### Server runtime model
-- **Async CQ + thread pool:** the gRPC server thread parks on the completion queue; per-call “call data” executes off-thread.
-- **Fairness:** writes are posted behind reads/alarms (via CQ alarm) so long-running writes don’t starve the stream.
-- **Stream lifecycle:** explicit down reasons (timeout, server shutdown, superseded by a newer device connection).
+### Runtime model
+- **Async CQ + thread pool:** the server thread parks on the completion queue; per-call “call data” runs off-thread.  
+- **Fairness:** writes posted behind reads/alarms (via CQ alarm).  
+- **Stream lifecycle:** explicit down reasons (timeout, server shutdown, superseded by a newer device).
 
 ---
+
+## What the server can do (Proto surface)
+<details>
+<summary>Expand to view .proto groups</summary>
+
+**User/Auth & Session**  
+`LoginFunction.proto`, `LoginSupportFunctions.proto`, `LoginToServerBasicInfo.proto`, `LoginValuesToReturnToClient.proto`, `PreLoginTimestamps.proto`, `AccountState.proto`, `UserAccountType.proto`, `AccountLoginTypeEnum.proto`, `AccessStatusEnum.proto`, `UserSubscriptionStatus.proto`
+
+**SMS/Email & Verification**  
+`SMSVerification.proto`, `EmailSendingMessages.proto`
+
+**Chat & Rooms**  
+`ChatMessageStream.proto`, `TypeOfChatMessage.proto`, `ChatMessageToClientMessage.proto`, `ChatRoomInfoMessage.proto`, `ChatRoomCommands.proto`, `CreatedChatRoomInfo.proto`, `UpdateOtherUserMessages.proto`, `MemberSharedInfoMessage.proto`
+
+**Matching & Discovery**  
+`FindMatches.proto`, `UserMatchOptions.proto`, `AlgorithmSearchOptions.proto`, `CategoryTimeFrame.proto`, `LetsGoEventStatus.proto`
+
+**Requests & Data Access**  
+`RequestMessages.proto`, `RequestFields.proto`, `RequestInformation.proto` (if present), `RetrieveServerLoad.proto`
+
+**Feedback/Reporting/Errors**  
+`FeedbackTypeEnum.proto`, `ReportMessages.proto`, `ErrorMessage.proto`, `ErrorOriginEnum.proto`, `SendErrorToServer.proto`
+
+**Admin (Desktop Interface / Ops)**  
+`AdminChatRoomCommands.proto`, `AdminEventCommands.proto`, `ManageServerCommands.proto`, `RequestAdminInfo.proto`, `RequestStatistics.proto`, `RequestUserAccountInfo.proto`, `SetAdminFields.proto`, `HandleErrors.proto`, `HandleReports.proto`, `HandleFeedback.proto`, `ErrorHandledMoveReasonEnum.proto`, `AdminLevelEnum.proto`, `UserAccountStatusEnum.proto`, `MatchTypeEnum.proto`, `AccountCategoryEnum.proto`
+
+> Contracts live in: **Lets_Go_Profobuf** (shared `.proto` files).
+</details>
+
+---
+## Data model (selected)
+| Collection        | Purpose                         | Notable indexes / notes                            |
+|-------------------|---------------------------------|----------------------------------------------------|
+| `USER_ACCOUNTS`   | Account profile & algo fields   | `PHONE_NUMBER` (unique), `ACCOUNT_ID_LIST` (unique), algorithm index fields |
+| `PENDING_ACCOUNT` | SMS verification staging        | uniques (`INDEXING`, `ID`, `PHONE_NUMBER`); **TTL** on verification timestamp |
+| `MESSAGES` / `ROOMS` | Chat storage + membership   | room id + timestamps; observed by change streams   |
+| `MATCHES`         | Candidate matches               | `userId`, `activityId`; recent-match recency idx   |
+| `ERRORS`          | Fresh/handled errors            | compound indexes; mark-type-as-handled workflow    |
+
+---
+
+## Design decisions (why)
+- **Stateless server nodes** for scale and easy rolling deploys; consistency in DB + tokens.  
+- **Duplicate-tolerant streaming** favors liveness; client-side dedupe is cheap.  
+- **CQ fairness** (write-behind) prevents chat stalls during heavy writes.  
+- **Aggregation-first matching** keeps rules declarative; compiled C++ avoids BSON round-trips.  
+- **Operational separation** (app vs data) isolates failures; Mongo **replica set** balances availability with simple ops for a small team.
+
+---
+
+## Code tour (where to look)
+
+**`/server/src/globals/`** — connection pool, thread-pool handle, server flags; canonical DB field names; live stream counters; env & I/O helpers.  
+**`/server/src/grpc_functions/`** — RPC handlers: chat stream & room commands; matching; login & SMS verification; request/read APIs; admin ops; email; load.  
+**`/server/src/utility/`** — async CQ loop; change-stream & fan-out; matching document builder; room membership; account lifecycle; stats utilities; startup/index bootstrap; lock-free primitives; error capture; shared helpers.  
+**`/server/testing/`** — account/media generators; mock gRPC stream; test scaffolding.  
+**`/test/`** — mirrors `grpc_functions/` & `utility/` with fixtures, seeded docs, and helpers.  
+**`/server/python/`** — small helper tools.  
+**`/server/resources/`** — static assets/config.  
+**`/obsolete/`** — legacy reference.
+
+---
+
+More documentation can be found inside the project files titled _documentation.md.
 
 ## Other Related Repositories
 
@@ -106,6 +119,8 @@ Separate Linux hosts for the **app server** and **MongoDB replica set**; systemd
 - **Protobuf Files** — protobuf files used to communicate between server and clients  
   👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Profobuf)
 
+## Status & compatibility
+Portfolio reference for a completed system. Deployed on **separate Linux hosts** (app servers + MongoDB **replica set**) with TLS and backups. Toolchains may be dated.
 
 ## License
 MIT

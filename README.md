@@ -103,7 +103,7 @@ Application server for the Lets Go platform. It serves Android and Desktop Admin
 
 ---
 
-More documentation can be found inside the project files titled _documentation.md.
+More explicit documentation can be found inside the project files titled **_documentation.md**.
 
 ## Other Related Repositories
 

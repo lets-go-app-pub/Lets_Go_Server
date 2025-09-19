@@ -35,8 +35,8 @@ Application server for the Lets Go platform. It serves Android and Desktop Admin
 - Results **always end with a cap** indicating success, no matches, cooldown, or out of swipes.
 
 ### Runtime model
-- **Async CQ + thread pool:** the server thread parks on the completion queue; per-call “call data” runs off-thread.  
-- **Fairness:** writes posted behind reads/alarms (via CQ alarm).  
+- **Async completion queue + thread pool:** the server thread parks on the completion queue; per-call “call data” runs off-thread.  
+- **Fairness:** writes posted behind reads/alarms (via completion queue alarm).  
 - **Stream lifecycle:** explicit down reasons (timeout, server shutdown, superseded by a newer device).
 
 ---
@@ -73,24 +73,24 @@ Application server for the Lets Go platform. It serves Android and Desktop Admin
 
 ## Data model (selected)
 
-MongoDB is organized by **database (domain)** → collections:
+| Domain (Mongo **database**)   | Key collections (with details)                                                                        | Notes |
+|---|---|---|
+| `accounts_objects`            | `USER_ACCOUNTS` (**unique** `PHONE_NUMBER`, `ACCOUNT_ID_LIST`), `PENDING_ACCOUNT` (**TTL** on verification) | Index/TTL checks at startup |
+| `chat_rooms_objects`          | `ROOMS` (membership/metadata), `MESSAGES` (`roomId` + timestamps; **observed via change streams**)     | Primary live-stream source |
+| `deleted_objects`             | `DELETED_MESSAGES`, `DELETED_ROOMS`, `DELETED_ACCOUNTS` (soft deletes; **timestamp indexed**)          | Audit-friendly retention |
+| `errors_objects`              | `FRESH_ERRORS`, `HANDLED_ERRORS` (**“mark type as handled”** workflow)                                 | Compound indexes for triage |
+| `feedback_objects`            | `FEEDBACK` (type, context, created time)                                                               | Time-based queries |
+| `info_for_statistics_objects` | `USER_STATS_DAILY`, `MATCH_STATS_DAILY` (**daily pre-aggregates by date**)                             | Precomputed analytics |
+| `reports_objects`             | `REPORTS` (reporter→target), `DISCIPLINARY_ACTIONS` (action timeline)                                  | Moderation artifacts |
 
-- `accounts_objects`: `USER_ACCOUNTS` (unique `PHONE_NUMBER`, `ACCOUNT_ID_LIST`), `PENDING_ACCOUNT` (TTL on verification).
-- `chat_rooms_objects`: `ROOMS` (membership/metadata), `MESSAGES` (roomId+timestamps; observed via **change streams**).
-- `deleted_objects`: soft-deleted `MESSAGES/ROOMS/ACCOUNTS` retained for audit (timestamp indexed).
-- `errors_objects`: `FRESH_ERRORS` and `HANDLED_ERRORS` (supports “mark type as handled” workflow).
-- `feedback_objects`: `FEEDBACK` (type, context, created time).
-- `info_for_statistics_objects`: daily pre-aggregates (user and matching stats by date).
-- `reports_objects`: `REPORTS` (reporter→target), `DISCIPLINARY_ACTIONS` (action timeline).
-
-**Notes:** Indexes/TTLs are validated at startup; relationships are by IDs (no cross-DB joins).
+**Notes:** Relationships are by IDs (**no cross-DB joins**).
 
 ---
 
 ## Design decisions (why)
 - **Stateless server nodes** for scale and easy rolling deploys; consistency in DB + tokens.  
 - **Duplicate-tolerant streaming** favors liveness; client-side dedupe is cheap.  
-- **CQ fairness** (write-behind) prevents chat stalls during heavy writes.  
+- **Completion Queue fairness** (write-behind) prevents chat stalls during heavy writes.  
 - **Aggregation-first matching** keeps rules declarative; compiled C++ avoids BSON round-trips.  
 - **Operational separation** (app vs data) isolates failures; Mongo **replica set** balances availability with simple ops for a small team.
 
@@ -100,7 +100,7 @@ MongoDB is organized by **database (domain)** → collections:
 
 **`/server/src/globals/`** — connection pool, thread-pool handle, server flags; canonical DB field names; live stream counters; env & I/O helpers.  
 **`/server/src/grpc_functions/`** — RPC handlers: chat stream & room commands; matching; login & SMS verification; request/read APIs; admin ops; email; load.  
-**`/server/src/utility/`** — async CQ loop; change-stream & fan-out; matching document builder; room membership; account lifecycle; stats utilities; startup/index bootstrap; lock-free primitives; error capture; shared helpers.  
+**`/server/src/utility/`** — async completion queue loop; change-stream & fan-out; matching document builder; room membership; account lifecycle; stats utilities; startup/index bootstrap; lock-free primitives; error capture; shared helpers.  
 **`/server/testing/`** — account/media generators; mock gRPC stream; test scaffolding.  
 **`/test/`** — mirrors `grpc_functions/` & `utility/` with fixtures, seeded docs, and helpers.  
 **`/server/python/`** — small helper tools.  
@@ -123,7 +123,7 @@ More explicit documentation can be found inside the project files titled **_docu
   👉 [`Lets_Go_Algorithm_And_Conversion`](https://github.com/lets-go-app-pub/Lets_Go_Algorithm_And_Conversion)
 
 - **Protobuf Files** — protobuf files used to communicate between server and clients  
-  👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Profobuf)
+  👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Protobuf)
 
 ## Status & compatibility
 Portfolio reference for a completed system. Deployed on **separate Linux hosts** (app servers + MongoDB **replica set**) with TLS and backups. Toolchains may be dated.

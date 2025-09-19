@@ -123,7 +123,7 @@ More explicit documentation can be found inside the project files titled **_docu
   👉 [`Lets_Go_Algorithm_And_Conversion`](https://github.com/lets-go-app-pub/Lets_Go_Algorithm_And_Conversion)
 
 - **Protobuf Files** — protobuf files used to communicate between server and clients  
-  👉 [`Lets_Go_Profobuf`](https://github.com/lets-go-app-pub/Lets_Go_Protobuf)
+  👉 [`Lets_Go_Protobuf`](https://github.com/lets-go-app-pub/Lets_Go_Protobuf)
 
 ## Status & compatibility
 Portfolio reference for a completed system. Deployed on **separate Linux hosts** (app servers + MongoDB **replica set**) with TLS and backups. Toolchains may be dated.
